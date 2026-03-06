@@ -1,0 +1,15 @@
+{
+  "name": "altmetric-node",
+  "version": "1.0.0",
+  "description": "Altmetric Score Viewer — Node.js dynamic badge renderer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2",
+    "xlsx": "^0.18.5"
+  }
+}
