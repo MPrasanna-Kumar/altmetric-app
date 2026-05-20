@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Altmetric Results</title>
+  <script src="https://d1bxh8uas1mnw7.cloudfront.net/assets/embed.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────────────── */
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:   #06102a; --navy2:  #0c1e42;
+      --blue:   #1a4faa; --blue2:  #2563c4;
+      --accent: #f59e0b; --acc2:   #fbbf24;
+      --green:  #059669; --emerald:#047857;
+      --red:    #dc2626; --amber:  #b45309;
+      --light:  #f1f5fc; --muted:  #8fa1bc;
+      --border: #dbe4f2; --white:  #ffffff;
+      --shadow-sm: 0 1px 4px rgba(6,16,42,.06);
+      --shadow:    0 4px 20px rgba(6,16,42,.09);
+      --shadow-lg: 0 8px 40px rgba(6,16,42,.14);
+    }
+    body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--navy);min-height:100vh}
+
+    /* ── Header ──────────────────────────────────────────────── */
+    header{
+      position:sticky;top:0;z-index:200;
+      background:var(--navy);
+      border-bottom:1px solid rgba(255,255,255,.07);
+      box-shadow:0 2px 20px rgba(6,16,42,.35);
+    }
+    .hi{max-width:1160px;margin:0 auto;padding:0 28px;height:64px;display:flex;align-items:center;gap:14px}
+    .logo{
+      width:38px;height:38px;flex-shrink:0;
+      background:linear-gradient(135deg,var(--accent),#e07b00);
+      border-radius:10px;display:flex;align-items:center;justify-content:center;
+      font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--navy);
+      box-shadow:0 2px 10px rgba(245,158,11,.4);
+    }
+    .ht{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.2px}
+    .hs{font-size:11px;color:rgba(255,255,255,.38);margin-top:1px}
+    .hact{margin-left:auto;display:flex;gap:10px;align-items:center}
+
+    .hbtn{
+      border:none;font-size:13px;font-weight:600;
+      padding:9px 18px;border-radius:9px;
+      text-decoration:none;display:inline-flex;align-items:center;gap:7px;
+      cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;
+    }
+    .back-btn{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);color:#fff}
+    .back-btn:hover{background:rgba(255,255,255,.17)}
+    .export-btn{background:linear-gradient(135deg,var(--green),var(--emerald));color:#fff;box-shadow:0 3px 12px rgba(5,150,105,.32)}
+    .export-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,.42)}
+    .export-btn:disabled{opacity:.55;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+
+    /* ── Progress banner ─────────────────────────────────────── */
+    .prog-banner{
+      background:linear-gradient(90deg,var(--navy2),#112250);
+      border-bottom:1px solid rgba(255,255,255,.06);
+      padding:12px 28px;
+    }
+    .pb-inner{max-width:1160px;margin:0 auto;display:flex;align-items:center;gap:18px}
+    .pb-status{font-size:12.5px;color:rgba(255,255,255,.55);white-space:nowrap;min-width:0;flex:1}
+    .pb-status strong{color:var(--acc2)}
+    .pb-track{width:220px;height:6px;background:rgba(255,255,255,.09);border-radius:3px;overflow:hidden;flex-shrink:0}
+    .pb-fill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--blue2),var(--accent));transition:width .4s ease}
+    .pb-frac{font-size:12px;font-family:'DM Mono',monospace;color:var(--acc2);white-space:nowrap;flex-shrink:0}
+
+    /* ── Page body ───────────────────────────────────────────── */
+    .page{max-width:1160px;margin:0 auto;padding:28px 28px 80px}
+
+    /* ── Stat cards row ──────────────────────────────────────── */
+    .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
+    .sc{
+      background:var(--white);border:1px solid var(--border);
+      border-radius:14px;padding:18px 20px;
+      display:flex;align-items:center;gap:14px;
+      box-shadow:var(--shadow-sm);transition:box-shadow .2s;
+    }
+    .sc:hover{box-shadow:var(--shadow)}
+    .sc-icon{
+      width:42px;height:42px;border-radius:11px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .sc-icon.blue  {background:#e8f0fc}
+    .sc-icon.green {background:#dcf5ec}
+    .sc-icon.amber {background:#fef3dc}
+    .sc-body{background:#fef3dc;padding:12px 16px;border-radius:10px;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+    .sc-n{font-size:24px;font-weight:700;color:var(--navy);font-family:'DM Mono',monospace;line-height:1}
+    .sc-n.green{color:var(--green)}
+    .sc-n.amber{color:var(--amber)}
+    .sc-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-top:4px}
+
+    /* ── Section header ──────────────────────────────────────── */
+    .section-hd{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:16px;
+    }
+    .section-title{font-family:'Playfair Display',serif;font-size:22px;color:var(--navy)}
+    .section-badge{
+      background:var(--blue);color:#fff;
+      font-size:12px;font-weight:700;
+      padding:4px 14px;border-radius:20px;
+      font-family:'DM Mono',monospace;
+    }
+
+    /* ── Article card ────────────────────────────────────────── */
+    .article-card{
+      background:var(--white);
+      border:1px solid var(--border);
+      border-radius:16px;
+      margin-bottom:12px;
+      display:flex;
+      align-items:stretch;
+      overflow:hidden;
+      box-shadow:var(--shadow-sm);
+      transition:transform .15s,box-shadow .15s;
+      position:relative;
+    }
+    .article-card::before{
+      content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+      background:linear-gradient(180deg,var(--blue),var(--blue2));
+      border-radius:3px 0 0 3px;
+    }
+    .article-card.invalid::before{background:linear-gradient(180deg,#fca5a5,#f87171)}
+    .article-card:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+
+    /* Serial no */
+    .card-sno{
+      width:52px;flex-shrink:0;
+      background:linear-gradient(180deg,#f8faff,#eef2fb);
+      border-right:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;font-weight:700;color:var(--blue);
+      font-family:'DM Mono',monospace;
+    }
+
+    /* Badge */
+    .card-badge{
+      width:86px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      padding:16px 10px;
+      border-right:1px solid var(--border);
+      background:#fafcff;
+    }
+    .badge-ph{
+      width:60px;height:60px;border-radius:50%;
+      background:var(--light);border:2px dashed var(--border);
+      display:flex;align-items:center;justify-content:center;
+    }
+
+    /* Body */
+    .card-body{
+      flex:1;min-width:0;
+      padding:16px 20px 14px;
+      display:flex;flex-direction:column;gap:8px;
+    }
+
+    /* Top row: title + score pill */
+    .card-top{display:flex;align-items:flex-start;gap:12px}
+    .card-title-block{flex:1;min-width:0}
+    .card-title{
+      font-size:14px;font-weight:600;color:var(--navy);
+      line-height:1.4;margin-bottom:4px;
+    }
+    .card-title.loading{
+      color:#c8d4e8;font-style:italic;font-weight:400;font-size:13px;
+      animation:shimmer 1.5s infinite;
+    }
+    @keyframes shimmer{0%,100%{opacity:1}50%{opacity:.35}}
+
+    /* DOI badge under title */
+    .card-doi{
+      display:inline-flex;align-items:center;gap:5px;
+      font-size:11.5px;font-family:'DM Mono',monospace;
+      color:var(--blue2);
+    }
+    .card-doi a{color:inherit;text-decoration:none}
+    .card-doi a:hover{text-decoration:underline}
+    .doi-chip{
+      display:inline-block;
+      background:#e8f0fc;color:var(--blue);
+      font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+      padding:1px 7px;border-radius:4px;margin-right:4px;flex-shrink:0;
+    }
+    .invalid-doi{font-size:12px;color:var(--red);font-family:'DM Sans',sans-serif}
+
+    /* Score pill (right side) */
+    .card-score-wrap{flex-shrink:0;text-align:center;min-width:80px}
+    .score-badge{
+      display:inline-flex;flex-direction:column;align-items:center;
+      background:#e8f5ee;border:1px solid #b8dfc8;
+      border-radius:12px;padding:8px 14px;
+      min-width:72px;
+    }
+    .score-badge.loading{
+      background:#f0f4fa;border-color:var(--border);
+      animation:shimmer 1.2s infinite;
+    }
+    .score-badge.none{background:#f7f9fc;border-color:#e8edf5}
+    .score-num{font-size:22px;font-weight:700;color:var(--green);font-family:'DM Mono',monospace;line-height:1}
+    .score-num.loading{font-size:13px;color:#aab;font-weight:400;letter-spacing:.5px}
+    .score-num.none{font-size:22px;color:#c8d4e4;font-weight:400}
+    .score-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+    .score-badge.none .score-lbl{color:#b8c4d8;font-size:9px}
+
+    /* Progress bar */
+    .card-progress{height:3px;background:#eef2f8;border-radius:2px;overflow:hidden;margin:-2px 0}
+    .cp-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--blue2),var(--accent));border-radius:2px;transition:width .5s ease}
+
+    /* Meta chips */
+    .card-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+    .chip-tag{
+      display:inline-flex;align-items:center;gap:4px;
+      font-size:10.5px;font-weight:600;padding:2px 10px;border-radius:8px;
+    }
+    .chip-tag.journal{background:#eaf0fa;color:var(--blue)}
+    .chip-tag.date   {background:#fef9ec;color:#9a6500}
+    .chip-tag.pmid   {background:#ecfdf5;color:var(--green)}
+    .chip-authors{font-size:11px;color:#7a8a9a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:700px}
+
+    /* Links footer */
+    .card-links{display:flex;gap:18px;flex-wrap:wrap}
+    .card-link{
+      font-size:11.5px;color:var(--muted);text-decoration:none;
+      display:inline-flex;align-items:center;gap:4px;
+      font-weight:500;transition:color .15s;
+    }
+    .card-link:hover{color:var(--blue)}
+    .card-link.alink:hover{color:var(--accent)}
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    .toast{
+      position:fixed;bottom:26px;right:26px;
+      background:var(--green);color:#fff;
+      font-size:13.5px;font-weight:600;
+      padding:12px 20px;border-radius:12px;
+      box-shadow:0 6px 24px rgba(0,0,0,.2);
+      display:flex;align-items:center;gap:9px;
+      opacity:0;transform:translateY(8px);
+      transition:opacity .3s,transform .3s;
+      pointer-events:none;z-index:999;
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+    @media(max-width:760px){
+      .stat-row{grid-template-columns:repeat(3,1fr)}
+      .card-score-wrap{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="hi">
+    <div class="logo">A</div>
+    <div>
+      <div class="ht">Altmetric Score Viewer</div>
+      <div class="hs">Results Dashboard</div>
+    </div>
+    <div class="hact">
+      <button class="hbtn export-btn" id="exportBtn" onclick="exportExcel()" disabled>
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        Fetching scores…
+      </button>
+      <a href="/" class="hbtn back-btn">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+        New Search
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- PROGRESS BANNER -->
+<div class="prog-banner">
+  <div class="pb-inner">
+    <div class="pb-status" id="pbStatus">Scores fetched server-side — loading results…</div>
+    <div class="pb-track"><div class="pb-fill" id="pbFill"></div></div>
+    <div class="pb-frac" id="pbFrac">0 / 0</div>
+  </div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- STAT CARDS -->
+  <div class="stat-row">
+    <div class="sc">
+      <div class="sc-icon blue">
+        <svg width="20" height="20" fill="none" stroke="#1a4faa" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <div class="sc-body">
+        <div class="sc-n" id="ss-total">—</div>
+        <div class="sc-l">Total Articles</div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon green">
+        <svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div class="sc-body">
+        <div class="sc-n green" id="ss-found">—</div>
+        <div class="sc-l">With Score</div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="sc-icon amber">
+        <svg width="20" height="20" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+        </svg>
+      </div>
+      <div class="sc-body">
+        <div class="sc-n amber" id="ss-none">—</div>
+        <div class="sc-l">No Score</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS SECTION -->
+  <div class="section-hd">
+    <div class="section-title">Altmetric Scores</div>
+    <span class="section-badge" id="sectionBadge">— article(s)</span>
+  </div>
+
+  <div id="articleList">
+    {{ROWS}}
+  </div>
+
+</div><!-- /page -->
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+  Excel tracker downloaded!
+</div>
+
+<!-- EXPORT DATA -->
+<script id="exportPayload" type="application/json">{{EXPORT_DATA}}</script>
+
+<script>
+// ── Data injected server-side (scores are null until badges render) ───────
+const exportItems = JSON.parse(document.getElementById('exportPayload').textContent);
+const TOTAL = exportItems.length;
+const allCards = Array.from(document.querySelectorAll('.article-card'));
+
+// Initialise stat cards
+document.getElementById('ss-total').textContent = TOTAL;
+document.getElementById('sectionBadge').textContent = TOTAL + ' article(s)';
+document.getElementById('ss-found').textContent = '0';
+document.getElementById('ss-none').textContent  = TOTAL;
+document.getElementById('pbFrac').textContent   = '0 / ' + TOTAL;
+document.getElementById('pbStatus').innerHTML   =
+  `Reading Altmetric scores from badges… <strong>0 / ${TOTAL}</strong>`;
+
+// ── Read score from a rendered badge (embed.js puts score in img alt) ─────
+function readBadgeScore(card) {
+  const img = card.querySelector('.altmetric-embed img[alt]');
+  if (!img) return null;
+  const m = img.alt.match(/(\d[\d.]*)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+// ── Update a single card's score badge in the UI ──────────────────────────
+function applyScore(card, score, idx) {
+  const sb = card.querySelector('.score-badge');
+  const sn = card.querySelector('.score-num');
+  const sl = card.querySelector('.score-lbl');
+  if (!sb || !sn) return;
+
+  sb.classList.remove('loading');
+
+  if (typeof score === 'number' && isFinite(score)) {
+    // Green score badge
+    sb.classList.remove('none');
+    sn.classList.remove('loading', 'none');
+    sn.textContent = Number.isInteger(score) ? String(score) : score.toFixed(1);
+    if (sl) sl.textContent = 'Score';
+    exportItems[idx].score = score;
+  } else {
+    // Grey dash — no score found
+    sb.classList.add('none');
+    sn.classList.remove('loading');
+    sn.classList.add('none');
+    sn.textContent = '—';
+    if (sl) sl.textContent = 'No score';
+    exportItems[idx].score = null;
+  }
+
+  // Per-card progress bar → 100%
+  const pf = card.querySelector('.cp-fill');
+  if (pf) pf.style.width = '100%';
+}
+
+// ── Update global stat cards ───────────────────────────────────────────────
+function refreshStats(resolved) {
+  const with_s = exportItems.filter(i => typeof i.score === 'number' && isFinite(i.score)).length;
+  const no_s   = exportItems.filter(i => i.score === null || i.score === undefined).length;
+  document.getElementById('ss-found').textContent = with_s;
+  document.getElementById('ss-none').textContent  = no_s;
+  document.getElementById('pbFrac').textContent   = resolved + ' / ' + TOTAL;
+  const pct = TOTAL > 0 ? (resolved / TOTAL) * 100 : 0;
+  document.getElementById('pbFill').style.width   = pct + '%';
+  document.getElementById('pbStatus').innerHTML   =
+    resolved < TOTAL
+      ? `Reading Altmetric scores… <strong>${resolved} / ${TOTAL}</strong>`
+      : `✓ &nbsp;Complete — <strong>${with_s} of ${TOTAL}</strong> article(s) have an Altmetric score`;
+}
+
+// ── Poll each card until its badge renders or timeout ─────────────────────
+// embed.js renders badges asynchronously; we poll per card so each card
+// updates the moment its score is available, rather than waiting for all.
+const POLL_INTERVAL = 300;   // ms between checks per card
+const MAX_WAIT      = 15000; // ms max wait per card
+
+let resolved = 0;
+
+function watchCard(card, idx) {
+  // Skip invalid cards (no DOI)
+  if (card.classList.contains('invalid')) {
+    applyScore(card, null, idx);
+    resolved++;
+    refreshStats(resolved);
+    return;
+  }
+
+  const start = Date.now();
+  const iv = setInterval(() => {
+    const score = readBadgeScore(card);
+
+    if (score !== null) {
+      // Badge rendered with a score
+      clearInterval(iv);
+      applyScore(card, score, idx);
+      resolved++;
+      refreshStats(resolved);
+    } else if (Date.now() - start > MAX_WAIT) {
+      // Timed out — badge either didn't render or article has no Altmetric score
+      clearInterval(iv);
+      applyScore(card, null, idx);
+      resolved++;
+      refreshStats(resolved);
+    }
+    // else: keep polling
+  }, POLL_INTERVAL);
+}
+
+// Start watching all cards
+allCards.forEach((card, idx) => watchCard(card, idx));
+
+// Enable export button (it's always available; scores fill in as badges render)
+const btn = document.getElementById('exportBtn');
+btn.disabled = false;
+btn.innerHTML = `
+  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="12" y1="18" x2="12" y2="12"/>
+    <line x1="9" y1="15" x2="15" y2="15"/>
+  </svg> Download Excel`;
+
+// ── Excel export ──────────────────────────────────────────────────────────
+function exportExcel() {
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"
+         viewBox="0 0 24 24" style="animation:spin .8s linear infinite">
+      <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" opacity=".25"/>
+      <path d="M21 12a9 9 0 0 0-9-9"/>
+    </svg> Preparing…`;
+  const form = document.createElement('form');
+  form.method = 'POST'; form.action = '/export';
+  const inp = document.createElement('input');
+  inp.type = 'hidden'; inp.name = 'data';
+  inp.value = JSON.stringify(exportItems);
+  form.appendChild(inp);
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg> Download Excel`;
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }, 2000);
+}
+</script>
+</body>
+</html>

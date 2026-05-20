@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Altmetric Score Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root{--navy:#06102a;--navy2:#0c1e42;--blue:#1a4faa;--blue2:#2563c4;--accent:#f59e0b;--accent2:#fbbf24;--green:#059669;--light:#f1f5fc;--muted:#8fa1bc;--border:#dbe4f2;--white:#ffffff;--shadow:0 8px 40px rgba(6,16,42,.10)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--navy);min-height:100vh;overflow-x:hidden}
+
+    /* ── Header ── */
+    header{position:sticky;top:0;z-index:200;background:var(--navy);border-bottom:1px solid rgba(255,255,255,.07);box-shadow:0 2px 20px rgba(6,16,42,.3)}
+    .hi{max-width:1100px;margin:0 auto;padding:0 32px;height:64px;display:flex;align-items:center;gap:14px}
+    .logo{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),#e07b00);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--navy);box-shadow:0 2px 10px rgba(245,158,11,.4);flex-shrink:0}
+    .ht{font-size:17px;font-weight:600;color:var(--white);letter-spacing:-.2px}
+    .hs{font-size:12px;color:rgba(255,255,255,.4);font-weight:400}
+    .hbadge{margin-left:auto;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--accent2);font-size:10.5px;font-weight:600;padding:4px 12px;border-radius:20px;letter-spacing:.4px;text-transform:uppercase}
+
+    /* ── Hero ── */
+    .hero{position:relative;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 50%,#0e2454 100%);padding:72px 32px 80px;overflow:hidden;text-align:center}
+    .orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.12;pointer-events:none}
+    .o1{width:500px;height:500px;background:var(--blue2);top:-200px;left:-100px}
+    .o2{width:400px;height:400px;background:var(--accent);top:-100px;right:-100px}
+    .o3{width:300px;height:300px;background:var(--green);bottom:-150px;left:50%;transform:translateX(-50%)}
+    .eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:20px;padding:6px 16px;margin-bottom:24px;font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:1.2px;text-transform:uppercase}
+    .edot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:blink 2s infinite}
+    @keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+    .hero h1{font-family:'Playfair Display',serif;font-size:clamp(34px,5vw,54px);color:var(--white);line-height:1.15;margin-bottom:16px}
+    .hero h1 span{color:var(--accent2)}
+    .hero-desc{font-size:17px;color:rgba(255,255,255,.55);max-width:480px;margin:0 auto 40px;line-height:1.7}
+    .hstats{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin-top:40px}
+    .hstat{text-align:center}
+    .hstat-n{font-size:26px;font-weight:700;color:var(--white);font-family:'DM Mono',monospace;letter-spacing:-1px}
+    .hstat-l{font-size:11px;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase;letter-spacing:.8px}
+    .hdiv{width:1px;background:rgba(255,255,255,.1)}
+
+    /* ── Main card ── */
+    .main-wrap{max-width:820px;margin:-32px auto 0;padding:0 24px 80px;position:relative;z-index:1}
+    .card{background:var(--white);border-radius:20px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden}
+    .card-hd{background:linear-gradient(90deg,#f8faff,#f1f5fc);padding:20px 28px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .ch-icon{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ch-title{font-size:14px;font-weight:600;color:var(--navy)}
+    .ch-sub{font-size:12px;color:var(--muted);margin-top:1px}
+    .card-body{padding:28px}
+
+    /* ── Textarea ── */
+    .ta-wrap{position:relative}
+    textarea{width:100%;height:180px;border:2px solid var(--border);border-radius:12px;padding:16px 18px;font-size:13px;font-family:'DM Mono',monospace;color:var(--navy);background:#fafcff;resize:vertical;transition:border-color .2s,box-shadow .2s;line-height:1.75}
+    textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(26,79,170,.08)}
+    textarea::placeholder{color:#b8c4d8}
+    .char-count{position:absolute;bottom:10px;right:14px;font-size:10.5px;color:var(--muted);font-family:'DM Mono',monospace}
+    .hint{margin-top:14px;padding:14px 18px;background:#f4f7ff;border-radius:10px;border-left:3px solid var(--blue2);font-size:12px;color:#4a5e80;line-height:1.85}
+    .hint strong{color:var(--blue)}
+    .hint code{background:#e4ecf8;padding:1px 7px;border-radius:4px;font-size:11px;font-family:'DM Mono',monospace;color:var(--blue2)}
+
+    /* ── Buttons ── */
+    .btn-row{display:flex;gap:12px;margin-top:22px;align-items:center}
+    .btn-primary{display:inline-flex;align-items:center;gap:9px;padding:13px 28px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 4px 16px rgba(26,79,170,.3);position:relative;overflow:hidden}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(26,79,170,.4)}
+    .btn-primary:active{transform:translateY(0)}
+    .btn-primary:disabled{opacity:.75;cursor:not-allowed;transform:none}
+    .btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:12px;font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s}
+    .btn-secondary:hover{color:var(--navy);border-color:var(--navy2)}
+
+    /* ── Samples ── */
+    .samples-section{margin-top:26px;padding-top:22px;border-top:1px solid var(--border)}
+    .samples-label{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#b0bac8;margin-bottom:10px}
+    .sg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#c8d2e2;margin:10px 0 6px}
+    .sgrid{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-family:'DM Mono',monospace;background:var(--light);color:var(--blue2);padding:5px 13px;border-radius:6px;cursor:pointer;border:1px solid var(--border);transition:all .15s;white-space:nowrap}
+    .chip:hover{background:var(--blue);color:#fff;border-color:var(--blue);transform:translateY(-1px);box-shadow:0 3px 10px rgba(26,79,170,.2)}
+
+    /* ── Features ── */
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+    .fc{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;transition:transform .2s,box-shadow .2s}
+    .fc:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(6,16,42,.08)}
+    .fi{width:44px;height:44px;border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
+    .fi.blue{background:#e8f0fc}.fi.amber{background:#fef3dc}.fi.green{background:#dcf5ec}
+    .ft{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:5px}
+    .fd{font-size:11.5px;color:var(--muted);line-height:1.6}
+
+    /* ═══════════════════════════════════
+       FULL-SCREEN LOADER OVERLAY
+    ═══════════════════════════════════ */
+    #loader-overlay{
+      position:fixed;inset:0;z-index:9999;
+      background:rgba(6,16,42,.92);
+      backdrop-filter:blur(6px);
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:0;
+    }
+    #loader-overlay.active{display:flex}
+
+    /* Animated ring */
+    .loader-ring{
+      position:relative;width:100px;height:100px;margin-bottom:32px;
+    }
+    .loader-ring svg{width:100%;height:100%;animation:rotate 2s linear infinite}
+    @keyframes rotate{to{transform:rotate(360deg)}}
+    .lr-track{fill:none;stroke:rgba(255,255,255,.08);stroke-width:6}
+    .lr-arc{fill:none;stroke:url(#arcGrad);stroke-width:6;stroke-linecap:round;stroke-dasharray:180 282;animation:dash 1.6s ease-in-out infinite}
+    @keyframes dash{
+      0%  {stroke-dasharray:10 282;stroke-dashoffset:0}
+      50% {stroke-dasharray:200 282;stroke-dashoffset:-80}
+      100%{stroke-dasharray:10 282;stroke-dashoffset:-282}
+    }
+
+    /* Inner logo */
+    .loader-inner{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    }
+    .loader-logo{
+      width:42px;height:42px;background:linear-gradient(135deg,var(--accent),#e07b00);
+      border-radius:11px;display:flex;align-items:center;justify-content:center;
+      font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy);
+      box-shadow:0 4px 16px rgba(245,158,11,.4);
+      animation:logoPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes logoPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+    .loader-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:8px;font-family:'Playfair Display',serif}
+    .loader-sub{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:36px}
+
+    /* Step list */
+    .loader-steps{display:flex;flex-direction:column;gap:12px;min-width:280px}
+    .lstep{
+      display:flex;align-items:center;gap:12px;
+      padding:11px 16px;border-radius:10px;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+      transition:all .4s;
+    }
+    .lstep.active{background:rgba(37,99,196,.2);border-color:rgba(37,99,196,.4)}
+    .lstep.done{background:rgba(5,150,105,.12);border-color:rgba(5,150,105,.25)}
+    .lstep-icon{
+      width:28px;height:28px;border-radius:8px;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.07);transition:background .4s;
+    }
+    .lstep.active .lstep-icon{background:rgba(37,99,196,.35)}
+    .lstep.done  .lstep-icon{background:rgba(5,150,105,.3)}
+    .lstep-text{font-size:13px;color:rgba(255,255,255,.5);font-weight:500;transition:color .4s}
+    .lstep.active .lstep-text{color:rgba(255,255,255,.9)}
+    .lstep.done  .lstep-text{color:rgba(255,255,255,.6)}
+
+    /* Spinner for active step */
+    .spin-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+    .lstep.active .spin-sm{display:block}
+    .lstep.done .spin-sm{display:none}
+    .check-sm{display:none;color:#34d399}
+    .lstep.done .check-sm{display:block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Dots counter */
+    .loader-dots{margin-top:28px;display:flex;gap:6px}
+    .ldot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);animation:dotPulse 1.4s ease-in-out infinite}
+    .ldot:nth-child(2){animation-delay:.2s}
+    .ldot:nth-child(3){animation-delay:.4s}
+    @keyframes dotPulse{0%,80%,100%{transform:scale(1);opacity:.3}40%{transform:scale(1.3);opacity:1}}
+
+    @media(max-width:600px){.features{grid-template-columns:1fr}.hstats{gap:20px}.hdiv{display:none}}
+  </style>
+</head>
+<body>
+
+<!-- ══ LOADER OVERLAY ══════════════════════════════════════════════════════ -->
+<div id="loader-overlay">
+  <div class="loader-ring">
+    <svg viewBox="0 0 100 100">
+      <defs>
+        <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#2563c4"/>
+          <stop offset="100%" stop-color="#f59e0b"/>
+        </linearGradient>
+      </defs>
+      <circle class="lr-track" cx="50" cy="50" r="45"/>
+      <circle class="lr-arc"   cx="50" cy="50" r="45"/>
+    </svg>
+    <div class="loader-inner"><div class="loader-logo">A</div></div>
+  </div>
+
+  <div class="loader-title">Fetching Altmetric Scores</div>
+  <div class="loader-sub">Resolving your articles, please wait…</div>
+
+  <div class="loader-steps">
+    <div class="lstep active" id="ls1">
+      <div class="lstep-icon">
+        <span class="spin-sm"></span>
+        <svg class="check-sm" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <span class="lstep-text">Parsing &amp; deduplicating inputs</span>
+    </div>
+    <div class="lstep" id="ls2">
+      <div class="lstep-icon">
+        <span class="spin-sm"></span>
+        <svg class="check-sm" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <span class="lstep-text">Resolving DOIs via Crossref</span>
+    </div>
+    <div class="lstep" id="ls3">
+      <div class="lstep-icon">
+        <span class="spin-sm"></span>
+        <svg class="check-sm" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <span class="lstep-text">Fetching metadata &amp; scores</span>
+    </div>
+    <div class="lstep" id="ls4">
+      <div class="lstep-icon">
+        <span class="spin-sm"></span>
+        <svg class="check-sm" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <span class="lstep-text">Building results page</span>
+    </div>
+  </div>
+
+  <div class="loader-dots">
+    <div class="ldot"></div><div class="ldot"></div><div class="ldot"></div>
+  </div>
+</div>
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<header>
+  <div class="hi">
+    <div class="logo">A</div>
+    <div><div class="ht">Altmetric Score Viewer</div><div class="hs">Research Impact Dashboard</div></div>
+    <span class="hbadge">No API Key Required</span>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+  <div class="eyebrow"><div class="edot"></div>Live Altmetric Data</div>
+  <h1>Discover Your Research<br><span>Attention Score</span></h1>
+  <p class="hero-desc">Paste DOIs or article URLs and instantly view Altmetric scores, metadata, and export a professional Excel tracker.</p>
+  <div class="hstats">
+    <div class="hstat"><div class="hstat-n">∞</div><div class="hstat-l">Articles at once</div></div>
+    <div class="hdiv"></div>
+    <div class="hstat"><div class="hstat-n">Live</div><div class="hstat-l">Score fetching</div></div>
+    <div class="hdiv"></div>
+    <div class="hstat"><div class="hstat-n">XLSX</div><div class="hstat-l">Export ready</div></div>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div class="card">
+    <div class="card-hd">
+      <div class="ch-icon">
+        <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </div>
+      <div><div class="ch-title">Enter DOIs or Article URLs</div><div class="ch-sub">One per line — all formats supported</div></div>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="/results" id="mainForm">
+        <div class="ta-wrap">
+          <textarea name="dois" id="doi-input"
+            placeholder="10.1177/1528083720939575&#10;https://doi.org/10.1038/nature12345&#10;https://www.sciencedirect.com/science/article/pii/S2352304225003605&#10;&#10;Paste one DOI or URL per line…"
+            oninput="updateCount(this)"></textarea>
+          <span class="char-count" id="char-count">0 lines</span>
+        </div>
+        <div class="hint">
+          💡 <strong>Accepted inputs — one per line:</strong>&nbsp;
+          Bare DOI: <code>10.1038/nature12345</code> &nbsp;·&nbsp;
+          DOI URL: <code>https://doi.org/10.1038/...</code> &nbsp;·&nbsp;
+          ScienceDirect, Nature, PubMed, or any publisher URL
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <svg id="btnIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <span id="btnText">Fetch Altmetric Scores</span>
+          </button>
+          <button type="reset" class="btn-secondary" id="clearBtn">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+            Clear
+          </button>
+        </div>
+      </form>
+
+      <div class="samples-section">
+        <div class="samples-label">Click to add sample inputs</div>
+        <div class="sg-label">DOIs</div>
+        <div class="sgrid">
+          <span class="chip" onclick="addDoi('10.1177/1528083720939575')">10.1177/1528083720939575</span>
+          <span class="chip" onclick="addDoi('10.1038/nature12345')">10.1038/nature12345</span>
+          <span class="chip" onclick="addDoi('10.1126/science.1234567')">10.1126/science.1234567</span>
+        </div>
+        <div class="sg-label">DOI URLs</div>
+        <div class="sgrid">
+          <span class="chip" onclick="addDoi('https://doi.org/10.1016/j.cell.2021.01.001')">https://doi.org/10.1016/j.cell.2021.01.001</span>
+        </div>
+        <div class="sg-label">Article URLs</div>
+        <div class="sgrid">
+          <span class="chip" onclick="addDoi('https://www.nature.com/articles/nature12345')">nature.com article URL</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="fc">
+      <div class="fi blue"><svg width="20" height="20" fill="none" stroke="#1a4faa" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+      <div class="ft">Auto DOI Lookup</div>
+      <div class="fd">Paste any article URL — DOIs resolved via Crossref & HTML meta tags automatically</div>
+    </div>
+    <div class="fc">
+      <div class="fi amber"><svg width="20" height="20" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="ft">Live Score Fetch</div>
+      <div class="fd">Real-time Altmetric scores with progress tracking and metadata enrichment</div>
+    </div>
+    <div class="fc">
+      <div class="fi green"><svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+      <div class="ft">Excel Export</div>
+      <div class="fd">Download a tracker with S.No, DOI No, Title, URL, Score & Altmetric link</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function updateCount(ta){
+    const l=ta.value.split('\n').filter(l=>l.trim()).length;
+    document.getElementById('char-count').textContent=l+(l===1?' line':' lines');
+  }
+  function addDoi(doi){
+    const ta=document.getElementById('doi-input');
+    const v=ta.value.trim();
+    ta.value=v?v+'\n'+doi:doi;
+    updateCount(ta);
+  }
+
+  // Step sequencer for loader animation
+  let stepTimer;
+  function runLoaderSteps(){
+    const steps=['ls1','ls2','ls3','ls4'];
+    let i=0;
+    // Immediately activate step 1
+    document.getElementById('ls1').classList.add('active');
+    stepTimer=setInterval(()=>{
+      if(i<steps.length-1){
+        // Mark current done
+        const cur=document.getElementById(steps[i]);
+        cur.classList.remove('active');
+        cur.classList.add('done');
+        i++;
+        // Activate next
+        document.getElementById(steps[i]).classList.add('active');
+      }
+    },900);
+  }
+
+  document.getElementById('mainForm').addEventListener('submit',function(e){
+    const val=document.getElementById('doi-input').value.trim();
+    if(!val){e.preventDefault();return;}
+
+    // Show overlay
+    const overlay=document.getElementById('loader-overlay');
+    overlay.classList.add('active');
+
+    // Disable button
+    const btn=document.getElementById('submitBtn');
+    btn.disabled=true;
+    document.getElementById('btnText').textContent='Processing…';
+    document.getElementById('clearBtn').disabled=true;
+
+    runLoaderSteps();
+    // Let form submit naturally
+  });
+
+  document.getElementById('clearBtn').addEventListener('click',function(){
+    document.getElementById('char-count').textContent='0 lines';
+  });
+</script>
+</body>
+</html>
