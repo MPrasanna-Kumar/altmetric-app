@@ -59,24 +59,43 @@ app.use((req,res,next) => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 // AFTER
+// ── 1. normaliseInput ──────────────────────────────────────────────────────
 function normaliseInput(raw) {
   let s = raw.trim();
-  
+ 
   // Strip doi.org resolver prefixes → bare DOI
   s = s.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
   s = s.replace(/^doi:\s*/i, '');
-
+ 
   // Universal: extract DOI from anywhere in the string
   const m = s.match(/\b(10\.\d{4,}\/[^\s?#"'<>]+)/);
   if (m) {
-    let doi = m[1].replace(/[.,;)]+$/, '');                                      // strip trailing punctuation
-    doi = doi.replace(/\/(html|full|abstract|pdf|epdf|full-text|htm)$/i, '');    // strip trailing path junk
+    let doi = m[1].replace(/[.,;)]+$/, '');
+    doi = doi.replace(/\/(html|full|abstract|pdf|epdf|full-text|htm)$/i, '');
     if (isValidDoi(doi)) return doi;
   }
-
-  // No DOI found — return as-is (ScienceDirect PII URLs, etc.)
+ 
+  // ── Nature / Springer Nature / BioMedCentral slug → DOI ──────────────────
+  // Handles:
+  //   https://www.nature.com/articles/s41392-024-02060-3
+  //   https://www.nature.com/articles/s41392-025-02150-w
+  //   https://www.biomedcentral.com/articles/10.1186/s13059-...  (caught above)
+  //   https://link.springer.com/article/10.1007/s00401-...       (caught above)
+  const natureSlugMatch = s.match(
+    /(?:nature\.com|springernature\.com|biomedcentral\.com)\/articles\/(s\d{5}-\d{3}-\d{5}-\w)/i
+  );
+  if (natureSlugMatch) {
+    const doi = `10.1038/${natureSlugMatch[1]}`;
+    if (isValidDoi(doi)) {
+      return doi;
+    }
+  }
+ 
+  // No DOI found — return as-is (handled by resolveDoi / Crossref fallback)
   return s;
 }
+ 
+ 
 function isValidDoi(s) { return /^10\.\d{4,}\/.+/.test(String(s||'')); }
 function extractAltmetricId(raw) {
   const m = String(raw).match(/altmetric\.com\/details\/(\d+)/i);
@@ -142,12 +161,68 @@ async function crossrefByPii(pii) {
   } catch { return null; }
 }
 
+// ── 2. crossrefByUrl  (NEW — add this after crossrefByPii) ────────────────
+// Resolves any article page URL → DOI via Crossref query.
+// Works for Nature, Springer, Wiley, Taylor & Francis, etc.
+// Does NOT scrape the publisher site, so it is never blocked.
+async function crossrefByUrl(articleUrl) {
+  if (!articleUrl || !articleUrl.startsWith('http')) return null;
+ 
+  const mailto = process.env.CROSSREF_MAILTO || 'altmetric-viewer@app';
+  const base   = process.env.CROSSREF_BASE_URL || 'https://api.crossref.org';
+ 
+  // Extract the slug/identifier at the end of the URL path for verification
+  // e.g. "s41392-024-02060-3" or "nature12345"
+  const slugMatch = articleUrl.match(/\/articles?\/([\w.-]+)\/?$/i)
+                 || articleUrl.match(/\/(?:full|abstract|html)?\/([\w.-]+)\/?$/i);
+  const slug = slugMatch ? slugMatch[1] : '';
+ 
+  // Query Crossref with the full URL as a free-text query
+  const encoded = encodeURIComponent(articleUrl);
+  const url = `${base}/works?query=${encoded}&rows=3&mailto=${mailto}`;
+ 
+  log.info(`Crossref URL lookup → ${articleUrl}`);
+  const res = await httpGet(url);
+  if (!res || res.status !== 200) return null;
+ 
+  try {
+    const items = JSON.parse(res.body).message?.items || [];
+    for (const item of items) {
+      if (!item.DOI) continue;
+      const doi = item.DOI.toLowerCase();
+ 
+      // Primary check: DOI suffix should contain the URL slug
+      if (slug && doi.includes(slug.toLowerCase())) {
+        log.success(`Crossref URL resolved → ${doi}`);
+        return doi;
+      }
+ 
+      // Fallback: check if Crossref's registered links match the domain
+      const links = [
+        ...(item.link || []).map(l => l.URL || ''),
+        ...(item.resource?.primary ? [item.resource.primary.URL] : []),
+      ];
+      const domain = articleUrl.replace(/^https?:\/\//i, '').split('/')[0];
+      if (links.some(l => l && l.includes(domain))) {
+        log.success(`Crossref URL resolved (link match) → ${doi}`);
+        return doi;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+ 
+
 // ── Resolve URL → DOI via HTML scraping ───────────────────────────────────
 // AFTER (add these lines at the top of resolveDoi, before the PII check)
+
+// ── 3. resolveDoi ─────────────────────────────────────────────────────────
 async function resolveDoi(articleUrl) {
   if (!articleUrl || !articleUrl.startsWith('http')) return null;
-
-  // ── De Gruyter: DOI is in the URL path ──────────────────────────────────
+ 
+  // ── De Gruyter: DOI is in the URL path ───────────────────────────────────
   // e.g. https://www.degruyterbrill.com/document/doi/10.1515/gps-2024-0233/html
   const dgMatch = articleUrl.match(/\/doi\/(10\.\d{4,}\/[^/?#"'<>\s]+)/i);
   if (dgMatch) {
@@ -157,12 +232,20 @@ async function resolveDoi(articleUrl) {
       return doi;
     }
   }
-
-  // ── ScienceDirect PII ────────────────────────────────────────────────────
+ 
+  // ── ScienceDirect PII ─────────────────────────────────────────────────────
   const pii = articleUrl.match(/\/pii\/(S[A-Z0-9]+)/i);
-  if (pii) { const d = await crossrefByPii(pii[1]); if(d) return d; }
-
-  // ── Generic HTML meta tag scrape ─────────────────────────────────────────
+  if (pii) {
+    const d = await crossrefByPii(pii[1]);
+    if (d) return d;
+  }
+ 
+  // ── Crossref URL lookup (Nature, Springer, Wiley, T&F, BMC, etc.) ─────────
+  // Preferred over HTML scraping — publishers block bots, Crossref never does.
+  const crDoi = await crossrefByUrl(articleUrl);
+  if (crDoi) return crDoi;
+ 
+  // ── Generic HTML meta tag scrape (last resort) ────────────────────────────
   const res = await httpGet(articleUrl, HTTP_TIMEOUT);
   if (!res || res.status !== 200) return null;
   const html = res.body;
@@ -174,13 +257,20 @@ async function resolveDoi(articleUrl) {
   for (const pat of patterns) {
     const m = html.match(pat);
     if (m) {
-      const doi = m[1].replace(/^https?:\/\/(dx\.)?doi\.org\//i,'').trim().replace(/[.,;)]+$/,'');
+      const doi = m[1]
+        .replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')
+        .trim()
+        .replace(/[.,;)]+$/, '');
       if (isValidDoi(doi)) return doi;
     }
   }
+ 
+  // Last-ditch: bare DOI anywhere in the HTML body
   const fb = html.match(/\b(10\.\d{4,}\/[^\s"'<>]+)/);
-  return fb ? fb[1].replace(/[.,;)]+$/,'') : null;
+  return fb ? fb[1].replace(/[.,;)]+$/, '') : null;
 }
+
+
 
 // ── Fully resolve one item ─────────────────────────────────────────────────
 async function resolveItem(item) {
