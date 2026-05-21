@@ -57,6 +57,21 @@ app.use((req,res,next) => {
   next();
 });
 
+
+// Add this helper
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise(resolve =>
+      setTimeout(() => {
+        log.warn(`Item timeout after ${ms}ms — skipping: ${label}`);
+        resolve(null);
+      }, ms)
+    )
+  ]);
+}
+
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 // AFTER
 // ── 1. normaliseInput ──────────────────────────────────────────────────────
@@ -81,16 +96,19 @@ function normaliseInput(raw) {
   //   https://www.nature.com/articles/s41392-025-02150-w
   //   https://www.biomedcentral.com/articles/10.1186/s13059-...  (caught above)
   //   https://link.springer.com/article/10.1007/s00401-...       (caught above)
-  const natureSlugMatch = s.match(
-    /(?:nature\.com|springernature\.com|biomedcentral\.com)\/articles\/(s\d{5}-\d{3}-\d{5}-\w)/i
-  );
-  if (natureSlugMatch) {
+  const natureSlugMatch = s.match(/(?:nature\.com|springernature\.com|biomedcentral\.com)\/articles\/(s\d{5}-\d{3,4}-\d{5}-[\w-]+)/i);
+  if (natureSlugMatch) 
+  {
+
     const doi = `10.1038/${natureSlugMatch[1]}`;
-    if (isValidDoi(doi)) {
-      return doi;
-    }
-  }
- 
+
+    log.info(`Nature slug match: "${natureSlugMatch[1]}" → DOI: ${doi}`);
+
+    if (isValidDoi(doi)) return doi;
+
+    log.warn(`Nature DOI failed validation: ${doi}`);
+
+  } 
   // No DOI found — return as-is (handled by resolveDoi / Crossref fallback)
   return s;
 }
@@ -105,21 +123,60 @@ function extractAltmetricId(raw) {
 // ── Generic HTTP GET with timeout → string ─────────────────────────────────
 function httpGet(url, timeoutMs = HTTP_TIMEOUT) {
   return new Promise((resolve) => {
+    let settled = false;
+    const done = (val) => { if (!settled) { settled = true; resolve(val); } };
+
     const mod = url.startsWith('https') ? https : http;
+
     const req = mod.get(url, {
-      headers:{ 'User-Agent':'AltmetricViewer/2.0', 'Accept':'application/json,text/html' },
-      timeout: timeoutMs
+      headers: { 'User-Agent': 'AltmetricViewer/2.0', 'Accept': 'application/json,text/html' },
     }, (res) => {
-      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location)
-        return httpGet(res.headers.location, timeoutMs).then(resolve);
+      // Follow redirects
+      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
+        res.resume(); // drain and discard
+        return httpGet(res.headers.location, timeoutMs).then(done);
+      }
+
       let body = '';
-      res.on('data', c => { body += c; if(body.length>200000) req.destroy(); });
-      res.on('end', () => resolve({ status: res.statusCode, body }));
+      const bodyTimer = setTimeout(() => {
+        req.destroy();
+        log.warn(`Body read timeout: ${url.slice(0, 80)}`);
+        done(null);
+      }, timeoutMs);
+
+      res.on('data', c => {
+        body += c;
+        if (body.length > 200000) { req.destroy(); }
+      });
+      res.on('end', () => {
+        clearTimeout(bodyTimer);
+        done({ status: res.statusCode, body });
+      });
+      res.on('error', () => { clearTimeout(bodyTimer); done(null); });
     });
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
+
+    // Hard connection timeout
+    const connTimer = setTimeout(() => {
+      req.destroy(new Error('connect timeout'));
+      log.warn(`Connect timeout: ${url.slice(0, 80)}`);
+      done(null);
+    }, timeoutMs);
+
+    req.on('socket', (socket) => {
+      socket.setTimeout(timeoutMs);
+      socket.on('timeout', () => {
+        req.destroy();
+        log.warn(`Socket timeout: ${url.slice(0, 80)}`);
+        done(null);
+      });
+    });
+
+    req.on('error', () => { clearTimeout(connTimer); done(null); });
+    req.on('close', () => clearTimeout(connTimer));
   });
 }
+
+
 
 // ── Crossref: fetch title + metadata by DOI ────────────────────────────────
 async function fetchCrossrefMeta(doi) {
@@ -273,7 +330,9 @@ async function resolveDoi(articleUrl) {
 
 
 // ── Fully resolve one item ─────────────────────────────────────────────────
+// Already exists — but add per-item logging in resolveItem:
 async function resolveItem(item) {
+  log.info(`resolveItem start → ${item.doi || item.articleUrl}`);
   let doi = isValidDoi(item.doi) ? item.doi : '';
 
   if (!doi && item.articleUrl && item.articleUrl.startsWith('http')) {
@@ -281,23 +340,25 @@ async function resolveItem(item) {
   }
 
   if (doi) {
+    log.info(`fetchCrossrefMeta → ${doi}`);
     const cr = await fetchCrossrefMeta(doi);
+    log.info(`fetchCrossrefMeta done → ${doi} — title: ${cr?.title?.slice(0,40) || 'null'}`);
     if (cr) return { ...item, ...cr, doi, score: null,
       altmetricId: item.altmetricId || '',
       detailsUrl: `https://www.altmetric.com/details/doi/${doi}` };
   }
 
+  log.warn(`resolveItem fallback (no metadata) → ${doi || item.articleUrl}`);
   return { ...item, doi, score: null, title: item.title || '',
            altmetricId: item.altmetricId || '', detailsUrl: '' };
 }
 
-// ── Build article card HTML ────────────────────────────────────────────────
 function buildRow(item, index) {
   const { doi, altmetricId, articleUrl, original, score, title,
           journal, publishedOn, authors, pubmedId, detailsUrl } = item;
-  const valid    = isValidDoi(doi);
-  const viewUrl  = articleUrl || original || (valid ? `https://doi.org/${doi}` : '#');
-  const altUrl   = detailsUrl || (altmetricId
+  const valid   = isValidDoi(doi);
+  const viewUrl = articleUrl || original || (valid ? `https://doi.org/${doi}` : '#');
+  const altUrl  = detailsUrl || (altmetricId
     ? `https://www.altmetric.com/details/${altmetricId}`
     : valid ? `https://www.altmetric.com/details/doi/${doi}` : '#');
 
@@ -312,33 +373,47 @@ function buildRow(item, index) {
   if (pubmedId)    chips.push(`<span class="chip-tag pmid">PMID ${pubmedId}</span>`);
 
   return `
-  <div class="article-card${valid?'':' invalid'}" data-index="${index}">
-    <div class="card-sno">${index+1}</div>
+  <div class="article-card${valid ? '' : ' invalid'}" data-index="${index}">
+    <div class="card-sno">${index + 1}</div>
 
     <div class="card-badge">
       ${valid
         ? `<div class="altmetric-embed"
-               data-badge-type="medium-donut" data-badge-popover="right"
-               data-hide-no-mentions="false" data-link-target="_blank"
-               ${altmetricId?`data-altmetric-id="${altmetricId}"`:`data-doi="${doi}"`}></div>`
-        : `<div class="badge-ph"><svg width="26" height="26" fill="none" stroke="#c0cce0" stroke-width="1.5" viewBox="0 0 24 24">
-             <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>`}
+               data-badge-type="medium-donut"
+               data-badge-popover="right"
+               data-hide-no-mentions="false"
+               data-link-target="_blank"
+               ${altmetricId ? `data-altmetric-id="${altmetricId}"` : `data-doi="${doi}"`}></div>`
+        : `<div class="badge-ph">
+             <svg width="26" height="26" fill="none" stroke="#c0cce0" stroke-width="1.5" viewBox="0 0 24 24">
+               <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+             </svg>
+           </div>`}
     </div>
 
     <div class="card-body">
       <div class="card-top">
         <div class="card-title-block">
-          <div class="card-title">${title || '<span style="color:#b8c4d8;font-style:italic;font-weight:400">Title not available</span>'}</div>
+          <div class="card-title">
+            ${title || '<span style="color:#b8c4d8;font-style:italic;font-weight:400">Title not available</span>'}
+          </div>
           <div class="card-doi">
             ${valid
-              ? `<span class="doi-chip">DOI</span><a href="https://doi.org/${doi}" target="_blank">${doi}</a>`
-              : `<span class="invalid-doi">⚠ No DOI — <em>${(articleUrl||'').slice(0,80)}</em></span>`}
+              ? `<span class="doi-chip">DOI</span>
+                 <a href="https://doi.org/${doi}" target="_blank">${doi}</a>`
+              : `<span class="invalid-doi">⚠ No DOI — <em>${(articleUrl || '').slice(0, 80)}</em></span>`}
           </div>
         </div>
+
+        <!-- Score badge — shows live value if server resolved it, else loading -->
         <div class="card-score-wrap">
-          <div class="score-badge loading">
-            <div class="score-num loading">…</div>
-            <div class="score-lbl">Score</div>
+          <div class="score-badge${hasScore ? '' : ' loading'}" data-score-badge="${index}">
+            <div class="score-num${hasScore ? '' : ' loading'}" data-score-num="${index}">
+              ${hasScore ? scoreDisplay : '…'}
+            </div>
+            <div class="score-lbl">
+              ${hasScore ? 'Score' : 'Score'}
+            </div>
           </div>
         </div>
       </div>
@@ -351,12 +426,22 @@ function buildRow(item, index) {
         <a class="card-link" href="${viewUrl}" target="_blank">
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-          </svg>View Article</a>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>View Article
+        </a>
         <a class="card-link alink" href="${altUrl}" target="_blank">
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-          </svg>Altmetric Details</a>
+          </svg>Altmetric Details
+        </a>
+        <button class="card-link skip-btn" data-index="${index}"
+          onclick="skipCard(this)"
+          style="background:none;border:none;cursor:pointer;padding:0;font-family:inherit">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>Skip
+        </button>
       </div>` : ''}
     </div>
   </div>`;
@@ -368,24 +453,26 @@ app.get('/', (req,res) => {
   res.send(fs.readFileSync(path.join(__dirname,'views/index.html'),'utf8'));
 });
 
-app.post('/results', async (req,res) => {
+app.post('/results', async (req, res) => {
   const raw  = req.body.dois || '';
   const seen = new Set();
 
   const lines = raw.split(/[\n\r]+/).flatMap(line => {
     const tokens = line.trim().split(/\s+/);
-    return (tokens.length>1 && tokens.every(t=>t.startsWith('http'))) ? tokens : [line.trim()];
+    return (tokens.length > 1 && tokens.every(t => t.startsWith('http'))) ? tokens : [line.trim()];
   }).filter(Boolean);
 
   let items = lines.map(line => {
-  const altmetricId = extractAltmetricId(line);
-  const cleaned     = line.replace(/https?:\/\/www\.altmetric\.com\/details\/\d+/gi,'').trim();
-  const doi         = normaliseInput(cleaned || line);   // bare DOI or original URL
-  const articleUrl  = cleaned || line;                   // always the full URL for scraping
-  return { original:line, articleUrl, doi, altmetricId, score:null,
-           title:'', journal:'', publishedOn:'', authors:'', pubmedId:'', detailsUrl:'' };
-}).filter(item => {
-    const key = item.doi||item.articleUrl;
+    const altmetricId = extractAltmetricId(line);
+    const cleaned     = line.replace(/https?:\/\/www\.altmetric\.com\/details\/\d+/gi, '').trim();
+    const doi         = normaliseInput(cleaned || line);
+    const articleUrl  = cleaned || line;
+    return {
+      original: line, articleUrl, doi, altmetricId, score: null,
+      title: '', journal: '', publishedOn: '', authors: '', pubmedId: '', detailsUrl: ''
+    };
+  }).filter(item => {
+    const key = item.doi || item.articleUrl;
     if (seen.has(key)) return false;
     seen.add(key); return true;
   });
@@ -394,31 +481,49 @@ app.post('/results', async (req,res) => {
 
   log.info(`Processing ${items.length} article(s) — resolving metadata…`);
 
-  for (let i=0; i<items.length; i+=BATCH_SIZE) {
-    const chunk   = items.slice(i, i+BATCH_SIZE);
-    const resolved = await Promise.all(chunk.map(item => resolveItem(item)));
-    for (let j=0; j<chunk.length; j++) items[i+j] = resolved[j];
+  // ── Batch loop — all awaits are INSIDE this async handler ────────────────
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const chunk    = items.slice(i, i + BATCH_SIZE);
+    const resolved = await Promise.all(
+      chunk.map(item =>
+        withTimeout(
+          resolveItem(item),
+          20000,                              // 20s max per article
+          item.doi || item.articleUrl
+        ).then(r => r || {                    // timed-out → return bare item
+          ...item,
+          score:       null,
+          title:       item.title || '',
+          altmetricId: item.altmetricId || '',
+          detailsUrl:  ''
+        })
+      )
+    );
+    for (let j = 0; j < chunk.length; j++) items[i + j] = resolved[j];
   }
 
-  const withScore = items.filter(it => typeof it.score==='number' && isFinite(it.score)).length;
+  const withScore = items.filter(it => typeof it.score === 'number' && isFinite(it.score)).length;
   log.success(`Done — ${withScore}/${items.length} articles have Altmetric scores`);
 
-  const rowsHtml   = items.map((item,i) => buildRow(item,i)).join('\n');
-  const exportData = items.map((item,i) => ({
-    sno:         String(i+1),
+  const rowsHtml   = items.map((item, i) => buildRow(item, i)).join('\n');
+  const exportData = items.map((item, i) => ({
+    sno:         String(i + 1),
     title:       item.title || '',
     original:    item.original,
-    articleUrl:  item.articleUrl||item.original,
+    articleUrl:  item.articleUrl || item.original,
     doi:         isValidDoi(item.doi) ? item.doi : '',
-    altmetricId: item.altmetricId||'',
+    altmetricId: item.altmetricId || '',
     score:       item.score,
     doiUrl:      isValidDoi(item.doi) ? `https://doi.org/${item.doi}` : '',
-    altmetricDetailsUrl: item.detailsUrl||
-      (item.altmetricId ? `https://www.altmetric.com/details/${item.altmetricId}`
-       : isValidDoi(item.doi) ? `https://www.altmetric.com/details/doi/${item.doi}` : '')
+    altmetricDetailsUrl: item.detailsUrl ||
+      (item.altmetricId
+        ? `https://www.altmetric.com/details/${item.altmetricId}`
+        : isValidDoi(item.doi)
+          ? `https://www.altmetric.com/details/doi/${item.doi}`
+          : '')
   }));
 
-  let html = fs.readFileSync(path.join(__dirname,'views/results.html'),'utf8');
+  let html = fs.readFileSync(path.join(__dirname, 'views/results.html'), 'utf8');
   html = html.replace('{{ROWS}}', rowsHtml);
   html = html.replace('{{EXPORT_DATA}}', JSON.stringify(exportData));
   res.send(html);

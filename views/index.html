@@ -8,7 +8,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
   <style>
-    :root{--navy:#06102a;--navy2:#0c1e42;--blue:#1a4faa;--blue2:#2563c4;--accent:#f59e0b;--accent2:#fbbf24;--green:#059669;--light:#f1f5fc;--muted:#8fa1bc;--border:#dbe4f2;--white:#ffffff;--shadow:0 8px 40px rgba(6,16,42,.10)}
+    :root{
+      --navy:#06102a;--navy2:#0c1e42;
+      --blue:#1a4faa;--blue2:#2563c4;
+      --accent:#f59e0b;--accent2:#fbbf24;
+      --green:#059669;--emerald:#047857;
+      --light:#f1f5fc;--muted:#8fa1bc;
+      --border:#dbe4f2;--white:#ffffff;
+      --shadow:0 8px 40px rgba(6,16,42,.10);
+    }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--navy);min-height:100vh;overflow-x:hidden}
 
@@ -83,9 +91,9 @@
     .ft{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:5px}
     .fd{font-size:11.5px;color:var(--muted);line-height:1.6}
 
-    /* ═══════════════════════════════════
+    /* ══════════════════════════════════
        FULL-SCREEN LOADER OVERLAY
-    ═══════════════════════════════════ */
+    ══════════════════════════════════ */
     #loader-overlay{
       position:fixed;inset:0;z-index:9999;
       background:rgba(6,16,42,.92);
@@ -99,9 +107,7 @@
     #loader-overlay.active{display:flex}
 
     /* Animated ring */
-    .loader-ring{
-      position:relative;width:100px;height:100px;margin-bottom:32px;
-    }
+    .loader-ring{position:relative;width:100px;height:100px;margin-bottom:32px}
     .loader-ring svg{width:100%;height:100%;animation:rotate 2s linear infinite}
     @keyframes rotate{to{transform:rotate(360deg)}}
     .lr-track{fill:none;stroke:rgba(255,255,255,.08);stroke-width:6}
@@ -113,36 +119,19 @@
     }
 
     /* Inner logo */
-    .loader-inner{
-      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    }
-    .loader-logo{
-      width:42px;height:42px;background:linear-gradient(135deg,var(--accent),#e07b00);
-      border-radius:11px;display:flex;align-items:center;justify-content:center;
-      font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy);
-      box-shadow:0 4px 16px rgba(245,158,11,.4);
-      animation:logoPulse 1.6s ease-in-out infinite;
-    }
+    .loader-inner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    .loader-logo{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),#e07b00);border-radius:11px;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy);box-shadow:0 4px 16px rgba(245,158,11,.4);animation:logoPulse 1.6s ease-in-out infinite}
     @keyframes logoPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 
     .loader-title{font-size:22px;font-weight:700;color:#fff;margin-bottom:8px;font-family:'Playfair Display',serif}
     .loader-sub{font-size:14px;color:rgba(255,255,255,.5);margin-bottom:36px}
 
     /* Step list */
-    .loader-steps{display:flex;flex-direction:column;gap:12px;min-width:280px}
-    .lstep{
-      display:flex;align-items:center;gap:12px;
-      padding:11px 16px;border-radius:10px;
-      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
-      transition:all .4s;
-    }
+    .loader-steps{display:flex;flex-direction:column;gap:12px;min-width:300px;max-width:360px;width:90vw}
+    .lstep{display:flex;align-items:center;gap:12px;padding:11px 16px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);transition:all .4s}
     .lstep.active{background:rgba(37,99,196,.2);border-color:rgba(37,99,196,.4)}
     .lstep.done{background:rgba(5,150,105,.12);border-color:rgba(5,150,105,.25)}
-    .lstep-icon{
-      width:28px;height:28px;border-radius:8px;flex-shrink:0;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(255,255,255,.07);transition:background .4s;
-    }
+    .lstep-icon{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.07);transition:background .4s}
     .lstep.active .lstep-icon{background:rgba(37,99,196,.35)}
     .lstep.done  .lstep-icon{background:rgba(5,150,105,.3)}
     .lstep-text{font-size:13px;color:rgba(255,255,255,.5);font-weight:500;transition:color .4s}
@@ -157,14 +146,33 @@
     .lstep.done .check-sm{display:block}
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* Dots counter */
+    /* Article count pill inside loader */
+    .loader-count{
+      margin-bottom:28px;
+      background:rgba(245,158,11,.12);
+      border:1px solid rgba(245,158,11,.28);
+      color:var(--accent2);
+      font-size:12px;font-weight:600;
+      padding:5px 16px;border-radius:20px;
+      font-family:'DM Mono',monospace;
+      letter-spacing:.3px;
+    }
+
+    /* Dots */
     .loader-dots{margin-top:28px;display:flex;gap:6px}
     .ldot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);animation:dotPulse 1.4s ease-in-out infinite}
     .ldot:nth-child(2){animation-delay:.2s}
     .ldot:nth-child(3){animation-delay:.4s}
     @keyframes dotPulse{0%,80%,100%{transform:scale(1);opacity:.3}40%{transform:scale(1.3);opacity:1}}
 
-    @media(max-width:600px){.features{grid-template-columns:1fr}.hstats{gap:20px}.hdiv{display:none}}
+    /* Elapsed timer */
+    .loader-timer{margin-top:12px;font-size:11.5px;color:rgba(255,255,255,.25);font-family:'DM Mono',monospace}
+
+    @media(max-width:600px){
+      .features{grid-template-columns:1fr}
+      .hstats{gap:20px}
+      .hdiv{display:none}
+    }
   </style>
 </head>
 <body>
@@ -186,10 +194,11 @@
   </div>
 
   <div class="loader-title">Fetching Altmetric Scores</div>
-  <div class="loader-sub">Resolving your articles, please wait…</div>
+  <div class="loader-sub" id="loaderSub">Resolving your articles, please wait…</div>
+  <div class="loader-count" id="loaderCount">0 articles queued</div>
 
   <div class="loader-steps">
-    <div class="lstep active" id="ls1">
+    <div class="lstep" id="ls1">
       <div class="lstep-icon">
         <span class="spin-sm"></span>
         <svg class="check-sm" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
@@ -222,19 +231,25 @@
   <div class="loader-dots">
     <div class="ldot"></div><div class="ldot"></div><div class="ldot"></div>
   </div>
+  <div class="loader-timer" id="loaderTimer">0s elapsed</div>
 </div>
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
 <header>
   <div class="hi">
     <div class="logo">A</div>
-    <div><div class="ht">Altmetric Score Viewer</div><div class="hs">Research Impact Dashboard</div></div>
+    <div>
+      <div class="ht">Altmetric Score Viewer</div>
+      <div class="hs">Research Impact Dashboard</div>
+    </div>
     <span class="hbadge">No API Key Required</span>
   </div>
 </header>
 
 <div class="hero">
-  <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
   <div class="eyebrow"><div class="edot"></div>Live Altmetric Data</div>
   <h1>Discover Your Research<br><span>Attention Score</span></h1>
   <p class="hero-desc">Paste DOIs or article URLs and instantly view Altmetric scores, metadata, and export a professional Excel tracker.</p>
@@ -256,7 +271,10 @@
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
       </div>
-      <div><div class="ch-title">Enter DOIs or Article URLs</div><div class="ch-sub">One per line — all formats supported</div></div>
+      <div>
+        <div class="ch-title">Enter DOIs or Article URLs</div>
+        <div class="ch-sub">One per line — all formats supported</div>
+      </div>
     </div>
     <div class="card-body">
       <form method="POST" action="/results" id="mainForm">
@@ -279,8 +297,10 @@
             </svg>
             <span id="btnText">Fetch Altmetric Scores</span>
           </button>
-          <button type="reset" class="btn-secondary" id="clearBtn">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          <button type="button" class="btn-secondary" id="clearBtn" onclick="clearForm()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+            </svg>
             Clear
           </button>
         </div>
@@ -300,7 +320,7 @@
         </div>
         <div class="sg-label">Article URLs</div>
         <div class="sgrid">
-          <span class="chip" onclick="addDoi('https://www.nature.com/articles/nature12345')">nature.com article URL</span>
+          <span class="chip" onclick="addDoi('https://www.nature.com/articles/s41392-025-02178-y')">nature.com article URL</span>
         </div>
       </div>
     </div>
@@ -308,17 +328,30 @@
 
   <div class="features">
     <div class="fc">
-      <div class="fi blue"><svg width="20" height="20" fill="none" stroke="#1a4faa" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+      <div class="fi blue">
+        <svg width="20" height="20" fill="none" stroke="#1a4faa" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </div>
       <div class="ft">Auto DOI Lookup</div>
       <div class="fd">Paste any article URL — DOIs resolved via Crossref & HTML meta tags automatically</div>
     </div>
     <div class="fc">
-      <div class="fi amber"><svg width="20" height="20" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="fi amber">
+        <svg width="20" height="20" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
       <div class="ft">Live Score Fetch</div>
       <div class="fd">Real-time Altmetric scores with progress tracking and metadata enrichment</div>
     </div>
     <div class="fc">
-      <div class="fi green"><svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+      <div class="fi green">
+        <svg width="20" height="20" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
       <div class="ft">Excel Export</div>
       <div class="fd">Download a tracker with S.No, DOI No, Title, URL, Score & Altmetric link</div>
     </div>
@@ -326,57 +359,126 @@
 </div>
 
 <script>
-  function updateCount(ta){
-    const l=ta.value.split('\n').filter(l=>l.trim()).length;
-    document.getElementById('char-count').textContent=l+(l===1?' line':' lines');
-  }
-  function addDoi(doi){
-    const ta=document.getElementById('doi-input');
-    const v=ta.value.trim();
-    ta.value=v?v+'\n'+doi:doi;
-    updateCount(ta);
+  /* ── Textarea helpers ─────────────────────────────────────────────── */
+  function updateCount(ta) {
+    const l = ta.value.split('\n').filter(l => l.trim()).length;
+    document.getElementById('char-count').textContent = l + (l === 1 ? ' line' : ' lines');
   }
 
-  // Step sequencer for loader animation
-  let stepTimer;
-  function runLoaderSteps(){
-    const steps=['ls1','ls2','ls3','ls4'];
-    let i=0;
-    // Immediately activate step 1
+  function addDoi(doi) {
+    const ta = document.getElementById('doi-input');
+    const v  = ta.value.trim();
+    ta.value = v ? v + '\n' + doi : doi;
+    updateCount(ta);
+    ta.focus();
+  }
+
+  function clearForm() {
+    document.getElementById('doi-input').value = '';
+    document.getElementById('char-count').textContent = '0 lines';
+  }
+
+  /* ── Loader step sequencer ───────────────────────────────────────── */
+  // Steps advance based on article count — more articles = slower steps
+  // so the animation feels proportional to actual server work.
+  let stepTimer   = null;
+  let elapsedTimer = null;
+  let elapsedSec  = 0;
+
+  function runLoaderSteps(articleCount) {
+    // Per-step delays scale with article count (min 1.5s, max 12s per step)
+    const base = Math.min(Math.max(articleCount * 0.9, 1.5), 12) * 1000;
+    const delays = [base * 0.5, base * 1.1, base * 1.8]; // steps 1→2, 2→3, 3→4
+
+    const steps = ['ls1', 'ls2', 'ls3', 'ls4'];
+
+    // Activate step 1 immediately
     document.getElementById('ls1').classList.add('active');
-    stepTimer=setInterval(()=>{
-      if(i<steps.length-1){
-        // Mark current done
-        const cur=document.getElementById(steps[i]);
+
+    delays.forEach((delay, idx) => {
+      setTimeout(() => {
+        const cur = document.getElementById(steps[idx]);
         cur.classList.remove('active');
         cur.classList.add('done');
-        i++;
-        // Activate next
-        document.getElementById(steps[i]).classList.add('active');
-      }
-    },900);
+        if (idx + 1 < steps.length) {
+          document.getElementById(steps[idx + 1]).classList.add('active');
+        }
+      }, delay);
+    });
   }
 
-  document.getElementById('mainForm').addEventListener('submit',function(e){
-    const val=document.getElementById('doi-input').value.trim();
-    if(!val){e.preventDefault();return;}
+  function startElapsedTimer() {
+    elapsedSec = 0;
+    const el = document.getElementById('loaderTimer');
+    elapsedTimer = setInterval(() => {
+      elapsedSec++;
+      el.textContent = elapsedSec + 's elapsed';
+    }, 1000);
+  }
+
+  function resetLoader() {
+    // Clear timers
+    clearInterval(elapsedTimer);
+
+    // Reset overlay
+    const overlay = document.getElementById('loader-overlay');
+    overlay.classList.remove('active');
+
+    // Reset buttons
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = false;
+    document.getElementById('btnText').textContent = 'Fetch Altmetric Scores';
+    document.getElementById('clearBtn').disabled = false;
+
+    // Reset all steps
+    ['ls1','ls2','ls3','ls4'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('active','done');
+    });
+
+    // Reset timer display
+    document.getElementById('loaderTimer').textContent = '0s elapsed';
+  }
+
+  /* ── Form submit ─────────────────────────────────────────────────── */
+  document.getElementById('mainForm').addEventListener('submit', function(e) {
+    const val = document.getElementById('doi-input').value.trim();
+    if (!val) { e.preventDefault(); return; }
+
+    // Count articles
+    const lineCount = val.split('\n').filter(l => l.trim()).length;
+
+    // Update loader text
+    document.getElementById('loaderSub').textContent =
+      'Resolving ' + lineCount + ' article' + (lineCount !== 1 ? 's' : '') + ', please wait…';
+    document.getElementById('loaderCount').textContent =
+      lineCount + ' article' + (lineCount !== 1 ? 's' : '') + ' queued';
 
     // Show overlay
-    const overlay=document.getElementById('loader-overlay');
-    overlay.classList.add('active');
+    document.getElementById('loader-overlay').classList.add('active');
 
-    // Disable button
-    const btn=document.getElementById('submitBtn');
-    btn.disabled=true;
-    document.getElementById('btnText').textContent='Processing…';
-    document.getElementById('clearBtn').disabled=true;
+    // Disable form controls
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('btnText').textContent = 'Processing…';
+    document.getElementById('clearBtn').disabled = true;
 
-    runLoaderSteps();
-    // Let form submit naturally
+    // Start animations
+    runLoaderSteps(lineCount);
+    startElapsedTimer();
+
+    // Safety net — release loader after 90 seconds to prevent permanent lock
+    setTimeout(resetLoader, 90000);
+
+    // Let form submit naturally (no e.preventDefault())
   });
 
-  document.getElementById('clearBtn').addEventListener('click',function(){
-    document.getElementById('char-count').textContent='0 lines';
+  /* ── Back/forward cache fix ──────────────────────────────────────── */
+  // When user hits browser Back from results page, bfcache restores the
+  // index page with the overlay still active. pageshow catches this.
+  window.addEventListener('pageshow', function(e) {
+    if (e.persisted) {
+      resetLoader();
+    }
   });
 </script>
 </body>

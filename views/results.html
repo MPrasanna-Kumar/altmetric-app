@@ -379,23 +379,26 @@ function readBadgeScore(card) {
 }
 
 // ── Update a single card's score badge in the UI ──────────────────────────
+// ── Update a single card's score badge ────────────────────────────────────
 function applyScore(card, score, idx) {
-  const sb = card.querySelector('.score-badge');
-  const sn = card.querySelector('.score-num');
-  const sl = card.querySelector('.score-lbl');
-  if (!sb || !sn) return;
+  const sb = document.querySelector(`[data-score-badge="${idx}"]`);
+  const sn = document.querySelector(`[data-score-num="${idx}"]`);
+  const sl = sb?.querySelector('.score-lbl');
 
+  // Hide skip button once score is resolved (either way)
+  const skipBtn = card.querySelector('.skip-btn');
+  if (skipBtn) skipBtn.style.display = 'none';
+
+  if (!sb || !sn) return;
   sb.classList.remove('loading');
 
   if (typeof score === 'number' && isFinite(score)) {
-    // Green score badge
     sb.classList.remove('none');
     sn.classList.remove('loading', 'none');
     sn.textContent = Number.isInteger(score) ? String(score) : score.toFixed(1);
     if (sl) sl.textContent = 'Score';
     exportItems[idx].score = score;
   } else {
-    // Grey dash — no score found
     sb.classList.add('none');
     sn.classList.remove('loading');
     sn.classList.add('none');
@@ -404,10 +407,23 @@ function applyScore(card, score, idx) {
     exportItems[idx].score = null;
   }
 
-  // Per-card progress bar → 100%
   const pf = card.querySelector('.cp-fill');
   if (pf) pf.style.width = '100%';
 }
+
+// ── Manual skip ───────────────────────────────────────────────────────────
+function skipCard(btn) {
+  const idx  = parseInt(btn.dataset.index);
+  const card = allCards[idx];
+  if (card.dataset.resolved) return;   // already done — ignore double-click
+  card.dataset.resolved = '1';
+  applyScore(card, null, idx);         // applyScore hides the button too
+  resolved++;
+  refreshStats(resolved);
+  console.log(`[Altmetric] Card ${idx + 1} manually skipped`);
+}
+
+
 
 // ── Update global stat cards ───────────────────────────────────────────────
 function refreshStats(resolved) {
@@ -433,34 +449,45 @@ const MAX_WAIT      = 15000; // ms max wait per card
 let resolved = 0;
 
 function watchCard(card, idx) {
-  // Skip invalid cards (no DOI)
+
+  const doi = card.querySelector('[data-doi]')?.dataset?.doi
+
+         || card.querySelector('[data-altmetric-id]')?.dataset?.altmetricId
+
+         || `card-${idx}`;
+
+  console.log(`[Altmetric] Watching card ${idx+1}: ${doi}`);
+
   if (card.classList.contains('invalid')) {
-    applyScore(card, null, idx);
-    resolved++;
-    refreshStats(resolved);
-    return;
-  }
 
-  const start = Date.now();
-  const iv = setInterval(() => {
-    const score = readBadgeScore(card);
+    console.warn(`[Altmetric] Card ${idx+1} is invalid — skipping`);
 
-    if (score !== null) {
-      // Badge rendered with a score
-      clearInterval(iv);
-      applyScore(card, score, idx);
-      resolved++;
-      refreshStats(resolved);
-    } else if (Date.now() - start > MAX_WAIT) {
-      // Timed out — badge either didn't render or article has no Altmetric score
-      clearInterval(iv);
       applyScore(card, null, idx);
       resolved++;
       refreshStats(resolved);
+      return;
     }
-    // else: keep polling
-  }, POLL_INTERVAL);
+    const start = Date.now();
+    const iv = setInterval(() => {
+      const score = readBadgeScore(card);
+    if (score !== null) console.log(`[Altmetric] Card ${idx+1} scored: ${score}`);
+
+      if (score !== null) {
+        clearInterval(iv);
+        applyScore(card, score, idx);
+        resolved++;
+        refreshStats(resolved);
+      } else if (Date.now() - start > MAX_WAIT) {
+      console.warn(`[Altmetric] Card ${idx+1} TIMED OUT — badge img:`, card.querySelector('.altmetric-embed img'));
+
+        clearInterval(iv);
+        applyScore(card, null, idx);
+        resolved++;
+        refreshStats(resolved);
+      }
+    }, POLL_INTERVAL);
 }
+
 
 // Start watching all cards
 allCards.forEach((card, idx) => watchCard(card, idx));
