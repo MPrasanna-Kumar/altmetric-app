@@ -131,22 +131,25 @@ function httpGet(url, timeoutMs = HTTP_TIMEOUT) {
     const req = mod.get(url, {
       headers: { 'User-Agent': 'AltmetricViewer/2.0', 'Accept': 'application/json,text/html' },
     }, (res) => {
+      // Clear connection timer — we're connected
+      clearTimeout(connTimer);
+
       // Follow redirects
       if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
-        res.resume(); // drain and discard
+        res.resume();
         return httpGet(res.headers.location, timeoutMs).then(done);
       }
 
       let body = '';
       const bodyTimer = setTimeout(() => {
         req.destroy();
-        log.warn(`Body read timeout: ${url.slice(0, 80)}`);
+        log.warn(`Body read timeout (${timeoutMs}ms): ${url.slice(0, 80)}`);
         done(null);
       }, timeoutMs);
 
       res.on('data', c => {
         body += c;
-        if (body.length > 200000) { req.destroy(); }
+        if (body.length > 500000) { clearTimeout(bodyTimer); req.destroy(); done(null); }
       });
       res.on('end', () => {
         clearTimeout(bodyTimer);
@@ -155,10 +158,10 @@ function httpGet(url, timeoutMs = HTTP_TIMEOUT) {
       res.on('error', () => { clearTimeout(bodyTimer); done(null); });
     });
 
-    // Hard connection timeout
+    // Connection timeout — fires if we never get a response header
     const connTimer = setTimeout(() => {
       req.destroy(new Error('connect timeout'));
-      log.warn(`Connect timeout: ${url.slice(0, 80)}`);
+      log.warn(`Connect timeout (${timeoutMs}ms): ${url.slice(0, 80)}`);
       done(null);
     }, timeoutMs);
 
@@ -166,13 +169,13 @@ function httpGet(url, timeoutMs = HTTP_TIMEOUT) {
       socket.setTimeout(timeoutMs);
       socket.on('timeout', () => {
         req.destroy();
-        log.warn(`Socket timeout: ${url.slice(0, 80)}`);
+        log.warn(`Socket timeout (${timeoutMs}ms): ${url.slice(0, 80)}`);
         done(null);
       });
     });
 
     req.on('error', () => { clearTimeout(connTimer); done(null); });
-    req.on('close', () => clearTimeout(connTimer));
+    // Removed req.on('close') — it fired before bodyTimer finished, clearing connTimer early
   });
 }
 
@@ -183,25 +186,45 @@ async function fetchCrossrefMeta(doi) {
   if (!isValidDoi(doi)) return null;
   const mailto = process.env.CROSSREF_MAILTO || 'altmetric-viewer@app';
   const base   = process.env.CROSSREF_BASE_URL || 'https://api.crossref.org';
-  const url = `${base}/works/${doi}?mailto=${mailto}`;
-  const res = await httpGet(url);
-  if (!res || res.status !== 200) return null;
-  try {
-    const w = JSON.parse(res.body).message;
-    if (!w) return null;
-    const titleArr = w.title || w['short-title'] || [];
-    const title    = (Array.isArray(titleArr) ? titleArr[0] : titleArr) || '';
-    const journal  = (w['container-title']||[])[0] || '';
-    let publishedOn = '';
-    const dp = w.published?.['date-parts']?.[0];
-    if (dp?.[0]) publishedOn = new Date(dp[0],(dp[1]||1)-1,dp[2]||1)
-      .toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-    const authors = (w.author||[]).slice(0,5)
-      .map(a=>a.name||[a.given,a.family].filter(Boolean).join(' ')).join(', ')
-      + ((w.author||[]).length>5?' et al.':'');
-    return { title, journal, publishedOn, authors, doi: w.DOI||doi };
-  } catch { return null; }
+  const url    = `${base}/works/${doi}?mailto=${mailto}`;
+
+  // Crossref can be slow — give it 20s, not the default 8s
+  const res = await httpGet(url, 20000);
+
+  if (res && res.status === 200) {
+    try {
+      const w = JSON.parse(res.body).message;
+      if (w) {
+        const titleArr  = w.title || w['short-title'] || [];
+        const title     = (Array.isArray(titleArr) ? titleArr[0] : titleArr) || '';
+        const journal   = (w['container-title'] || [])[0] || '';
+        let publishedOn = '';
+        const dp = w.published?.['date-parts']?.[0];
+        if (dp?.[0]) publishedOn = new Date(dp[0], (dp[1] || 1) - 1, dp[2] || 1)
+          .toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+        const authors = (w.author || []).slice(0, 5)
+          .map(a => a.name || [a.given, a.family].filter(Boolean).join(' ')).join(', ')
+          + ((w.author || []).length > 5 ? ' et al.' : '');
+
+        if (title) return { title, journal, publishedOn, authors, doi: w.DOI || doi };
+
+        log.warn(`Crossref returned empty title for ${doi} — trying Nature scrape`);
+      }
+    } catch (e) {
+      log.warn(`Crossref JSON parse error for ${doi}: ${e.message}`);
+    }
+  } else {
+    log.warn(`Crossref ${res?.status ?? 'timeout/no response'} for ${doi} — trying Nature scrape`);
+  }
+
+  // Fallback: scrape Nature directly for 10.1038/* DOIs
+  if (doi.startsWith('10.1038/')) {
+    return await scrapeNatureMeta(doi);
+  }
+
+  return null;
 }
+
 
 // ── Crossref: PII → DOI ────────────────────────────────────────────────────
 async function crossrefByPii(pii) {
@@ -271,6 +294,51 @@ async function crossrefByUrl(articleUrl) {
   }
 }
  
+// ── Nature direct scrape fallback (when Crossref has no metadata yet) ──────
+async function scrapeNatureMeta(doi) {
+  if (!doi || !doi.startsWith('10.1038/')) return null;
+  const url = `https://www.nature.com/articles/${doi.replace('10.1038/', '')}`;
+  log.info(`Nature scrape fallback → ${url}`);
+  const res = await httpGet(url, HTTP_TIMEOUT);
+  if (!res || res.status !== 200) return null;
+  const html = res.body;
+
+  // Title — from <meta name="citation_title">
+  const titleMatch = html.match(/<meta[^>]+name=["']citation_title["'][^>]+content=["']([^"']+)["']/i)
+                  || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_title["']/i)
+                  || html.match(/<h1[^>]+class=["'][^"']*c-article-title[^"']*["'][^>]*>([\s\S]*?)<\/h1>/i);
+  const title = titleMatch
+    ? titleMatch[1].replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim()
+    : '';
+
+  // Journal
+  const journalMatch = html.match(/<meta[^>]+name=["']citation_journal_title["'][^>]+content=["']([^"']+)["']/i)
+                    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_journal_title["']/i);
+  const journal = journalMatch ? journalMatch[1].trim() : 'Signal Transduction and Targeted Therapy';
+
+  // Published date
+  const dateMatch = html.match(/<meta[^>]+name=["']citation_publication_date["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_publication_date["']/i);
+  let publishedOn = '';
+  if (dateMatch) {
+    const d = new Date(dateMatch[1]);
+    if (!isNaN(d)) publishedOn = d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  // Authors — from multiple citation_author meta tags
+  const authorMatches = [...html.matchAll(/<meta[^>]+name=["']citation_author["'][^>]+content=["']([^"']+)["']/gi)];
+  const authors = authorMatches.slice(0, 5).map(m => m[1].trim()).join(', ')
+    + (authorMatches.length > 5 ? ' et al.' : '');
+
+  if (!title) {
+    log.warn(`Nature scrape: no title found for ${doi}`);
+    return null;
+  }
+
+  log.success(`Nature scrape resolved → "${title.slice(0, 50)}…"`);
+  return { title, journal, publishedOn, authors, doi };
+}
+
 
 // ── Resolve URL → DOI via HTML scraping ───────────────────────────────────
 // AFTER (add these lines at the top of resolveDoi, before the PII check)
@@ -488,7 +556,7 @@ app.post('/results', async (req, res) => {
       chunk.map(item =>
         withTimeout(
           resolveItem(item),
-          20000,                              // 20s max per article
+          40000,                              // 40s max per article
           item.doi || item.articleUrl
         ).then(r => r || {                    // timed-out → return bare item
           ...item,
